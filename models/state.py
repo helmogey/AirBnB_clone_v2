@@ -3,8 +3,6 @@
 from sqlalchemy import Column, String
 from sqlalchemy.orm import relationship
 from models.base_model import BaseModel, Base
-import shlex
-import models
 from models.city import City
 
 
@@ -16,17 +14,11 @@ class State(BaseModel, Base):
 
     @property
     def cities(self):
-        """Getter attribute for cities"""        
-        var = models.storage.all()
-        lista = []
-        result = []
-        for key in var:
-            city = key.replace('.', ' ')
-            city = shlex.split(city)
-            if (city[0] == 'City'):
-                lista.append(var[key])
-        for elem in lista:
-            if (elem.state_id == self.id):
-                result.append(elem)
-        return (result)
+        """Getter attribute for cities"""
+        from models import storage
+        city_list = []
+        for city in storage.all(City).values():
+            if city.state_id == self.id:
+                city_list.append(city)
+        return city_list
 
