@@ -17,7 +17,7 @@ def do_deploy(archive_path, user, key_filename):
     """
 
     # Define web server hosts
-    env.hosts = ['<IP web-01>', '<IP web-02>']
+    env.hosts = ["34.234.201.238", "54.237.54.236"]
     env.user = user
     env.key_filename = key_filename
 
