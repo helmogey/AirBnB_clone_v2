@@ -1,64 +1,48 @@
 #!/usr/bin/python3
 # script that generates a .tgz archive
-from fabric import Connection, env
-import os
+import os.path
+from fabric.api import env
+from fabric.api import put
+from fabric.api import run
 
 
-def do_deploy(archive_path, user, key_filename):
-    """Deploys the archive to web servers.
+env.hosts = ["34.234.201.238", "54.237.54.236"]
+def do_deploy(archive_path):
+    """Distributes an archive to a web server.
 
     Args:
-        archive_path (str): Path to the archive file.
-        user (str): Username for SSH access to the servers.
-        key_filename (str): Path to the SSH key file.
-
+        archive_path (str): The path of the archive to distribute.
     Returns:
-        bool: True if deployment is successful, False otherwise.
+        If the file doesn't exist at archive_path or an error occurs - False.
+        Otherwise - True.
     """
-
-    # Define web server hosts
-    env.hosts = ["34.234.201.238", "54.237.54.236"]
-    env.user = user
-    env.key_filename = key_filename
-
-    # Check if archive exists
-    if not os.path.exists(archive_path):
-        print(f"Error: Archive file not found: {archive_path}")
+    if os.path.isfile(archive_path) is False:
         return False
+    file = archive_path.split("/")[-1]
+    name = file.split(".")[0]
 
-    # Connect to each web server
-    with Connection.parallel() as c:
-        for server in c:
-            # Upload archive to /tmp/
-            try:
-                server.put(archive_path, remote='/tmp/')
-            except Exception as e:
-                print(f"Error uploading archive to {server.host}: {e}")
-                return False
-
-            # Extract archive
-            archive_filename = os.path.basename(archive_path)
-            target_dir = f"/data/web_static/releases/{archive_filename.split('.')[0]}"
-            try:
-                server.run(f"tar -xzf /tmp/{archive_filename} -C {target_dir}")
-            except Exception as e:
-                print(f"Error extracting archive on {server.host}: {e}")
-                return False
-
-            # Delete archive
-            try:
-                server.run(f"rm /tmp/{archive_filename}")
-            except Exception as e:
-                print(f"Error deleting archive on {server.host}: {e}")
-                return False
-
-            # Delete symbolic link and recreate it
-            try:
-                server.run("rm /data/web_static/current", warn=True)  # Suppress warning if link doesn't exist
-                server.run(f"ln -s {target_dir} /data/web_static/current")
-            except Exception as e:
-                print(f"Error creating symbolic link on {server.host}: {e}")
-                return False
-
-    print("Deployment successful!")
+    if put(archive_path, "/tmp/{}".format(file)).failed is True:
+        return False
+    if run("rm -rf /data/web_static/releases/{}/".
+           format(name)).failed is True:
+        return False
+    if run("mkdir -p /data/web_static/releases/{}/".
+           format(name)).failed is True:
+        return False
+    if run("tar -xzf /tmp/{} -C /data/web_static/releases/{}/".
+           format(file, name)).failed is True:
+        return False
+    if run("rm /tmp/{}".format(file)).failed is True:
+        return False
+    if run("mv /data/web_static/releases/{}/web_static/* "
+           "/data/web_static/releases/{}/".format(name, name)).failed is True:
+        return False
+    if run("rm -rf /data/web_static/releases/{}/web_static".
+           format(name)).failed is True:
+        return False
+    if run("rm -rf /data/web_static/current").failed is True:
+        return False
+    if run("ln -s /data/web_static/releases/{}/ /data/web_static/current".
+           format(name)).failed is True:
+        return False
     return True
